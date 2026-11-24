@@ -2,6 +2,7 @@
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Googel</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 64 64%27%3E%3Crect width=%2764%27 height=%2764%27 rx=%2714%27 fill=%27white%27/%3E%3Ctext x=%2732%27 y=%2747%27 font-size=%2744%27 font-family=%27Arial,sans-serif%27 font-weight=%27bold%27 text-anchor=%27middle%27 fill=%27%234285f4%27%3EG%3C/text%3E%3C/svg%3E">
 <style>
 :root{--bg:#fff;--fg:#202124;--mut:#5f6368;--line:#dfe1e5;--btn:#f8f9fa;--link:#1a0dab;--ac:#1a73e8}
 @media(prefers-color-scheme:dark){:root{color-scheme:dark;--bg:#202124;--fg:#e8eaed;--mut:#9aa0a6;--line:#5f6368;--btn:#303134;--link:#8ab4f8;--ac:#8ab4f8}}
@@ -25,6 +26,7 @@ ul{margin:12px 0 0;padding:0;list-style:none;font-size:13px;color:var(--mut)}li.
 .row{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap}.row button,.row a{background:var(--btn);color:var(--fg);border:1px solid var(--line);border-radius:4px;padding:8px 14px;cursor:pointer;font-size:14px}
 #err{color:#d93025;font-size:22px;font-weight:bold;text-align:center;margin-top:16px;max-width:584px;opacity:0;transition:opacity .6s}#err.show{opacity:1}
 @media(prefers-color-scheme:dark){#err{color:#f28b82}}
+.sk{background:var(--btn);border:1px solid var(--line);border-radius:12px;padding:14px 18px;text-align:center;margin-top:12px;max-width:584px;width:100%}.sk b{font-size:20px}.sk button{background:var(--ac);color:var(--bg);border:0;border-radius:4px;padding:8px 14px;cursor:pointer;font-size:14px;margin:10px 6px 0}.sk button.s{background:var(--btn);color:var(--fg);border:1px solid var(--line)}
 .hint{color:var(--mut);font-size:13px;margin-top:18px;text-align:center}
 footer{border-top:1px solid var(--line);background:var(--btn);color:var(--mut);font-size:13px}
 </style></head><body>
@@ -35,13 +37,13 @@ footer{border-top:1px solid var(--line);background:var(--btn);color:var(--mut);f
 <p class="sub" id="sub"></p>
 <div class="box"><input id="q" autocomplete="off" placeholder="One word" aria-label="one word"></div>
 <div class="btns"><button id="go">Google Search</button></div>
-<div id="err"></div><div class="res" id="res"></div><p class="hint" id="hint"></p>
+<div id="err"></div><div class="res" id="res"></div><div id="streak"></div><p class="hint" id="hint"></p>
 </main>
 <footer><span>Googel · fewer appearances on Google’s top pages = rarer</span></footer>
 <script>
 var T=[["Animals","animal"],["Countries","country"],["Foods","food"],["Sports","sport"],["Musical instruments","instrument"],["Cities","city"],["Plants","plant"],["Languages","language"],["Colors","color"],["Fruits","fruit"]];
 var R=["Common Googler","Casual Searcher","Tab Hoarder","Query Crafter","Long-Tail Hunter","Algorithm Whisperer","Cosmic Indexer","Intergalactic Googler"],CUT=[0,15,30,45,60,75,90,97];
-var API="";   // after deploying the API, put its URL here, e.g. "https://googel-api.onrender.com"
+var API=(window.GOOGEL||{}).api||"";   // set by the server from the API_URL env var (leave empty when the same server runs the API)
 var mode,cur,done,busy;
 fetch(API+"/health").catch(function(){});   // wakes a sleeping server while the player reads the theme
 function $(i){return document.getElementById(i)}
@@ -51,9 +53,24 @@ function today(){var d=new Date();return d.getUTCFullYear()+"-"+(d.getUTCMonth()
 var errT;function showErr(m){$("hint").textContent="";var e=$("err");e.textContent=m;e.className="show";clearTimeout(errT);errT=setTimeout(function(){e.className=""},4500)}
 function rarity(n){return Math.max(0,Math.round(100-18*Math.log10(Math.max(1,n))))}
 function rank(s){var r=0;CUT.forEach(function(c,i){if(s>=c)r=i});return r}
+var CLERK_KEY=(window.GOOGEL||{}).clerk||"";   // set by the server from the CLERK_PUBLISHABLE_KEY env var; empty = no sign-in box
+var clerkOn=false,sbusy=false;
+function dkey(off){var d=new Date(Date.now()-off*864e5);return d.getUTCFullYear()+"-"+(d.getUTCMonth()+1)+"-"+d.getUTCDate()}
+function addScript(src,key,cb){var s=document.createElement("script");s.src=src;s.async=true;s.crossOrigin="anonymous";if(key)s.setAttribute("data-clerk-publishable-key",key);s.onload=cb;document.head.appendChild(s)}
+function loadClerk(){if(!CLERK_KEY)return;var host;try{host=atob(CLERK_KEY.split("_")[2]).slice(0,-1)}catch(e){return}
+ addScript("https://"+host+"/npm/@clerk/ui@1/dist/ui.browser.js",null,function(){
+  addScript("https://"+host+"/npm/@clerk/clerk-js@6/dist/clerk.browser.js",CLERK_KEY,async function(){
+   try{await Clerk.load({ui:{ClerkUI:window.__internal_ClerkUICtor}});clerkOn=true;Clerk.addListener(function(){streakPanel()});streakPanel()}catch(e){}})})}
+async function streakPanel(){var el=$("streak");if(!(done&&mode=="daily")){el.innerHTML="";return}
+ if(!CLERK_KEY||!clerkOn||sbusy)return;
+ if(!Clerk.user){el.innerHTML='<div class="sk">Want to keep a daily streak? Sign up or log in to track it. It’s optional.<br><button id="su">Sign up</button><button class="s" id="li">Log in</button></div>';$("su").onclick=function(){Clerk.openSignUp()};$("li").onclick=function(){Clerk.openSignIn()};return}
+ var u=Clerk.user,m=(u.unsafeMetadata||{}).streak||{count:0,best:0,last:""};
+ if(m.last!=today()){sbusy=true;var c=m.last==dkey(1)?m.count+1:1;m={count:c,best:Math.max(c,m.best||0),last:today()};
+  try{await u.update({unsafeMetadata:Object.assign({},u.unsafeMetadata,{streak:m})})}catch(e){}sbusy=false}
+ el.innerHTML='<div class="sk"><b>🔥 '+m.count+'-day streak</b><br>Best: '+m.best+'. Come back tomorrow to keep it going.<br><button class="s" id="so">Sign out</button></div>';$("so").onclick=function(){Clerk.signOut()}}
 function setMode(m){mode=m;$("nd").className=m=="daily"?"on":"";$("nf").className=m=="free"?"on":"";
  cur=m=="daily"?Math.floor(Date.now()/864e5)%T.length:Math.floor(Math.random()*T.length);
- done=false;busy=false;$("res").innerHTML="";$("q").value="";$("q").disabled=false;
+ done=false;busy=false;$("res").innerHTML="";$("streak").innerHTML="";$("q").value="";$("q").disabled=false;
  $("topic").textContent=(m=="daily"?"Today’s theme: ":"Theme: ")+T[cur][0];
  $("sub").textContent="Search ONE word that fits the theme. We Google it, count how often it appears on the top pages, and the fewer times, the higher you rank.";
  $("hint").textContent=m=="daily"?"One attempt per day, same theme for everyone.":"";
@@ -62,9 +79,9 @@ function show(r,locked){done=true;$("q").disabled=true;var s=rarity(r.total),i=r
  var L=R.map(function(n,j){return'<li class="'+(j==i?"me":"")+'">'+n+"</li>"}).reverse().join("");
  var P=r.pages.filter(function(p){return p.count}).map(function(p){var h="";try{h=new URL(p.url).hostname}catch(e){}return"<li><span>"+esc(h)+"</span><span>"+p.count+"×</span></li>"}).join("");
  $("res").innerHTML='<div class="card"><div class="big">You searched “'+esc(r.q)+'”</div><div class="rank">'+R[i]+'</div><div class="big">Appeared '+r.total+' time'+(r.total==1?"":"s")+' across '+r.pages.length+' top pages. Rarity '+s+'/100.</div><div class="bar"><i style="left:calc('+s+'% - 2px)"></i></div><ul>'+L+'</ul><ul class="pg">'+P+'</ul><div class="row"><a target="_blank" rel="noopener" href="https://www.google.com/search?q='+encodeURIComponent(r.q+" "+T[cur][1])+'">Open real Google results</a><button id="sh">Share</button>'+(mode=="free"?'<button id="nx">Next theme</button>':"")+"</div></div>";
- $("sh").onclick=function(){var t="Googel "+(mode=="daily"?today():"free")+"\n"+T[cur][0]+"\n🔍 "+R[i]+" ("+r.total+" appearances)";if(navigator.clipboard)navigator.clipboard.writeText(t)};
+ $("sh").onclick=function(){var t="Googel "+(mode=="daily"?today():"free")+"\n"+T[cur][0]+"\n🔍 "+R[i]+" ("+r.total+" appearances)";var b=$("sh");function ok(){b.textContent="Copied!";setTimeout(function(){b.textContent="Share"},2000)}if(navigator.clipboard)navigator.clipboard.writeText(t).then(ok,function(){prompt("Copy this:",t)});else prompt("Copy this:",t)};
  if($("nx"))$("nx").onclick=function(){setMode("free")};
- if(locked)$("hint").textContent="You’ve used today’s search. Come back tomorrow or try free play."}
+ if(locked)$("hint").textContent="You’ve used today’s search. Come back tomorrow or try free play.";streakPanel()}
 async function submit(){if(done||busy)return;var w=$("q").value.trim();
  if(!/^[A-Za-z\u00C0-\u024F]+(['-][A-Za-z\u00C0-\u024F]+)*$/.test(w)){showErr("One word only, letters only.");return}
  busy=true;$("hint").textContent="Googling and counting on the top pages. If the server was asleep this can take a couple of minutes…";
@@ -73,9 +90,9 @@ async function submit(){if(done||busy)return;var w=$("q").value.trim();
   if(!j.ok){showErr(j.error);busy=false;return}
   if(!j.valid){showErr("Couldn’t find “"+w+"” used as a "+T[cur][1]+" on the top pages. Try another word.");busy=false;return}
   var r={q:w,total:j.total,pages:j.pages};if(mode=="daily")ls("googel-"+today(),JSON.stringify(r));
-  $("hint").textContent="";show(r,false)}catch(e){showErr("Couldn’t reach the server. Try again in a moment.")}
+  $("hint").textContent="";show(r,false);streakPanel()}catch(e){showErr("Couldn’t reach the server. Try again in a moment.")}
  busy=false}
 $("go").onclick=submit;$("q").onkeydown=function(e){if(e.key=="Enter")submit()};
 function route(){setMode(location.hash=="#free"?"free":"daily")}
-window.addEventListener("hashchange",route);route();
+window.addEventListener("hashchange",route);route();loadClerk();
 </script></body></html>
