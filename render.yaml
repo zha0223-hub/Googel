@@ -1,0 +1,13 @@
+services:
+  # Always-on front page: static sites never sleep, so no "waking up" screen for visitors
+  - type: web
+    runtime: static
+    name: googel
+    staticPublishPath: .
+  # The scoring API: free, sleeps when idle, woken automatically when the page opens
+  - type: web
+    runtime: python
+    name: googel-api
+    plan: free
+    buildCommand: pip install -r requirements.txt && python -c "import nltk; nltk.download('wordnet')"
+    startCommand: gunicorn server:app --timeout 120
