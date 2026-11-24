@@ -23,6 +23,8 @@ main{flex:1;display:flex;flex-direction:column;align-items:center;padding:6vh 16
 ul{margin:12px 0 0;padding:0;list-style:none;font-size:13px;color:var(--mut)}li.me{color:var(--fg);font-weight:bold}li.me::before{content:"▶ "}
 .pg li{display:flex;justify-content:space-between;gap:10px}.pg span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .row{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap}.row button,.row a{background:var(--btn);color:var(--fg);border:1px solid var(--line);border-radius:4px;padding:8px 14px;cursor:pointer;font-size:14px}
+#err{color:#d93025;font-size:22px;font-weight:bold;text-align:center;margin-top:16px;max-width:584px;opacity:0;transition:opacity .6s}#err.show{opacity:1}
+@media(prefers-color-scheme:dark){#err{color:#f28b82}}
 .hint{color:var(--mut);font-size:13px;margin-top:18px;text-align:center}
 footer{border-top:1px solid var(--line);background:var(--btn);color:var(--mut);font-size:13px}
 </style></head><body>
@@ -33,7 +35,7 @@ footer{border-top:1px solid var(--line);background:var(--btn);color:var(--mut);f
 <p class="sub" id="sub"></p>
 <div class="box"><input id="q" autocomplete="off" placeholder="One word" aria-label="one word"></div>
 <div class="btns"><button id="go">Google Search</button></div>
-<div class="res" id="res"></div><p class="hint" id="hint"></p>
+<div id="err"></div><div class="res" id="res"></div><p class="hint" id="hint"></p>
 </main>
 <footer><span>Googel · fewer appearances on Google’s top pages = rarer</span></footer>
 <script>
@@ -46,6 +48,7 @@ function $(i){return document.getElementById(i)}
 function esc(s){return String(s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
 function ls(k,v){try{if(v===undefined)return localStorage.getItem(k);localStorage.setItem(k,v)}catch(e){return null}}
 function today(){var d=new Date();return d.getUTCFullYear()+"-"+(d.getUTCMonth()+1)+"-"+d.getUTCDate()}
+var errT;function showErr(m){$("hint").textContent="";var e=$("err");e.textContent=m;e.className="show";clearTimeout(errT);errT=setTimeout(function(){e.className=""},4500)}
 function rarity(n){return Math.max(0,Math.round(100-18*Math.log10(Math.max(1,n))))}
 function rank(s){var r=0;CUT.forEach(function(c,i){if(s>=c)r=i});return r}
 function setMode(m){mode=m;$("nd").className=m=="daily"?"on":"";$("nf").className=m=="free"?"on":"";
@@ -63,14 +66,14 @@ function show(r,locked){done=true;$("q").disabled=true;var s=rarity(r.total),i=r
  if($("nx"))$("nx").onclick=function(){setMode("free")};
  if(locked)$("hint").textContent="You’ve used today’s search. Come back tomorrow or try free play."}
 async function submit(){if(done||busy)return;var w=$("q").value.trim();
- if(!/^[A-Za-z\u00C0-\u024F]+(['-][A-Za-z\u00C0-\u024F]+)*$/.test(w)){$("hint").textContent="One word only, letters only. No attempt used.";return}
+ if(!/^[A-Za-z\u00C0-\u024F]+(['-][A-Za-z\u00C0-\u024F]+)*$/.test(w)){showErr("One word only, letters only.");return}
  busy=true;$("hint").textContent="Googling and counting on the top pages. If the server was asleep this can take a couple of minutes…";
  try{var ac=new AbortController();setTimeout(function(){ac.abort()},120000);
   var j=await (await fetch(API+"/api/score?word="+encodeURIComponent(w)+"&theme="+encodeURIComponent(T[cur][1]),{signal:ac.signal})).json();
-  if(!j.ok){$("hint").textContent=j.error;busy=false;return}
-  if(!j.valid){$("hint").textContent="Couldn’t find “"+w+"” used as a "+T[cur][1]+" on Google’s top pages. Try another word. No attempt used.";busy=false;return}
+  if(!j.ok){showErr(j.error);busy=false;return}
+  if(!j.valid){showErr("Couldn’t find “"+w+"” used as a "+T[cur][1]+" on the top pages. Try another word.");busy=false;return}
   var r={q:w,total:j.total,pages:j.pages};if(mode=="daily")ls("googel-"+today(),JSON.stringify(r));
-  $("hint").textContent="";show(r,false)}catch(e){$("hint").textContent="Couldn’t reach the server. Is server.py running?"}
+  $("hint").textContent="";show(r,false)}catch(e){showErr("Couldn’t reach the server. Try again in a moment.")}
  busy=false}
 $("go").onclick=submit;$("q").onkeydown=function(e){if(e.key=="Enter")submit()};
 function route(){setMode(location.hash=="#free"?"free":"daily")}
